@@ -1,0 +1,11 @@
+node_modules
+dist
+.env
+# Ignore env files in client and server
+client/.env
+server/.env
+
+.DS_Store
+server/public
+vite.config.ts.*
+*.tar.gz

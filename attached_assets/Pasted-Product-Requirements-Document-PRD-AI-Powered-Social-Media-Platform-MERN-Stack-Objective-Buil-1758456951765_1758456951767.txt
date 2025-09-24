@@ -1,0 +1,152 @@
+Product Requirements Document (PRD)
+AI-Powered Social Media Platform (MERN Stack)
+🏁 Objective
+
+Build a full-stack platform that allows businesses and individuals to:
+
+Generate content using an AI chatbot.
+
+Schedule posts on a calendar interface.
+
+Automatically publish content to Twitter, LinkedIn, and Instagram.
+
+👥 Target Users
+
+Small businesses managing their social media presence.
+
+Freelancers & creators who want to post consistently on multiple platforms.
+
+Marketing teams that need a centralized tool for scheduling + AI-generated content.
+
+🎯 Core Features
+1. Authentication & User Management
+
+User signup/login with JWT authentication.
+
+User profile setup (business details stored for AI context).
+
+Connect accounts via OAuth for Twitter, LinkedIn, Instagram.
+
+2. AI Chatbot for Content Creation
+
+Chatbot UI built in React.
+
+Backend integrates with Gemini API.
+
+Context is stored per user in MongoDB (Conversation model).
+
+AI generates:
+
+Text posts
+
+Image/video captions
+
+Hashtags & call-to-actions
+
+3. Content Review & Editing
+
+Draft posts shown in the dashboard.
+
+User can edit text, add/remove media.
+
+Save as draft before scheduling.
+
+4. Content Calendar & Scheduling
+
+Calendar interface using FullCalendar.js (React).
+
+Drag & drop posts to reschedule.
+
+Post types: static or dynamic.
+
+Backend saves posts in MongoDB (Post model).
+
+5. Automated Posting
+
+Scheduler service (node-cron) runs in backend.
+
+At scheduled time → fetch post → publish via platform API.
+
+Post status transitions: draft → scheduled → posted.
+
+Logging system (SchedulerLog model) to track success/failure.
+
+6. Dashboard
+
+Display connected accounts.
+
+Show upcoming + past posts (list + calendar view).
+
+Post details and edit option.
+
+(Bonus) Basic analytics: likes, comments, shares.
+
+🏗️ Tech Stack (MERN)
+
+Frontend: React.js, Tailwind CSS, FullCalendar.js
+
+Backend: Node.js, Express.js
+
+Database: MongoDB (Mongoose ODM)
+
+AI: Gemini API for chatbot + content generation
+
+Auth: JWT + OAuth (Passport.js for social logins)
+
+Scheduler:  node-cron
+
+📂 Data Models (Summary)
+
+User
+
+Name, Email, Password (hashed), ConnectedAccounts (OAuth tokens), Profile info.
+
+Conversation
+
+Chat history (messages), AI context, linked to User.
+
+Post
+
+Content (text, media, caption), Platforms, ScheduledAt, Status, Results.
+
+Media
+
+File URL, Type (image/video), Metadata, Owner.
+
+SchedulerLog
+
+Each attempt to post → status, response, errors.
+
+ApiUsage (optional)
+
+Track AI + provider API usage for cost limits.
+
+🔄 System Flow
+
+User Signup/Login
+
+User registers → JWT session created.
+
+Account Linking
+
+User connects Twitter, LinkedIn, Instagram via OAuth.
+
+Content Creation
+
+User chats with AI → AI generates draft content.
+
+Content Review & Editing
+
+User edits content, attaches media, saves as draft.
+
+Scheduling
+
+User selects date/time on calendar → backend saves scheduled post.
+
+Automated Posting
+
+Scheduler service runs at correct time → posts published via APIs.
+
+Dashboard View
+
+User sees scheduled/past posts, edits drafts, tracks status.
