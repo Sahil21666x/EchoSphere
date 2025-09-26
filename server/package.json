@@ -34,11 +34,13 @@
     "multer": "^2.0.2",
     "node-cron": "^4.2.1",
     "nodemon": "^3.1.10",
+    "oauth-1.0a": "^2.2.6",
     "passport": "^0.7.0",
     "passport-instagram": "^1.0.0",
     "passport-jwt": "^4.0.1",
     "passport-linkedin-oauth2": "^2.0.0",
     "passport-twitter": "^1.0.4",
+    "passport-twitter-oauth2": "^2.1.1",
     "tsx": "^4.20.5"
   }
 }

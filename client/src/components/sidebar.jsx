@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 export default function Sidebar({ currentView, onViewChange, onCreatePost }) {
   const { user, logoutMutation } = useAuth();
   const [connectedAccounts, setConnectedAccounts] = useState([]);
-  const[connected, setConnected] = useState(false);
+  const [connected, setConnected] = useState(false);
 
   const handleLogout = () => {
     logoutMutation.mutate();
@@ -17,17 +17,25 @@ export default function Sidebar({ currentView, onViewChange, onCreatePost }) {
       try {
         const res = await fetch(`${import.meta.env.VITE_API_URL}/api/accounts`, {
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`, // assuming JWT token
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
           credentials: "include",
         });
-        
+
         const data = await res.json();
-        console.log(data);
-        if(data?.summary?.connected===0){
-          setConnected(true);
-        }
-        setConnectedAccounts(data?.accounts || []);
+
+        // data.accounts is an object, convert to array
+        const accountsArray = Object.keys(data.accounts || {}).map((key) => ({
+          provider: key,
+          ...data.accounts[key],
+        }));
+
+
+        setConnectedAccounts(accountsArray);
+
+
+        // Check if no accounts connected
+        setConnected((data.summary?.connected || 0) === 0);
       } catch (error) {
         console.error("Failed to fetch accounts", error);
       }
@@ -56,6 +64,30 @@ export default function Sidebar({ currentView, onViewChange, onCreatePost }) {
       console.error(`Failed to connect ${provider}`, error);
     }
   };
+
+  const handleDisconnect = async (provider) => {
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/accounts/unlink/${provider}`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+        credentials: "include",
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        alert(`${provider} disconnected!`);
+        // Refresh connected accounts
+        setConnectedAccounts((prev) => prev.filter((acc) => acc.provider !== provider));
+      } else {
+        alert(data.message);
+      }
+    } catch (error) {
+      console.error(`Failed to disconnect ${provider}`, error);
+    }
+  };
+
 
   const navItems = [
     { id: "dashboard", icon: "fas fa-chart-bar", label: "Dashboard" },
@@ -90,11 +122,10 @@ export default function Sidebar({ currentView, onViewChange, onCreatePost }) {
           <button
             key={item.id}
             onClick={() => onViewChange(item.id)}
-            className={`w-full flex items-center space-x-3 p-3 rounded-lg transition-colors ${
-              currentView === item.id
-                ? "bg-blue-50 text-blue-700"
-                : "text-muted-foreground hover:bg-secondary hover:text-foreground"
-            }`}
+            className={`w-full flex items-center space-x-3 p-3 rounded-lg transition-colors ${currentView === item.id
+              ? "bg-blue-50 text-blue-700"
+              : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+              }`}
             data-testid={`nav-${item.id}`}
           >
             <i className={`${item.icon} w-5`}></i>
@@ -109,7 +140,7 @@ export default function Sidebar({ currentView, onViewChange, onCreatePost }) {
           Connected Accounts
         </h3>
         <div className="space-y-2">
-          { connected ? (
+          {connected ? (
             <p className="text-xs text-muted-foreground">
               No accounts connected yet
             </p>
@@ -134,9 +165,17 @@ export default function Sidebar({ currentView, onViewChange, onCreatePost }) {
                   </span>
                 </div>
                 <div
-                  className="w-2 h-2 bg-green-500 rounded-full"
+                  className={`w-2 h-2 ${acc.connected ? 'bg-green-500' : 'bg-red-500'} bg-green-500 rounded-full`}
                   title="Connected"
                 ></div>
+                {
+                  acc.connected && <button
+                    className="text-xs text-red-500 hover:underline"
+                    onClick={() => handleDisconnect(acc.provider)}
+                  >
+                    Disconnect
+                  </button>
+                }
               </div>
             ))
           )}

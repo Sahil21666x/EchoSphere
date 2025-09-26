@@ -77,6 +77,27 @@ router.get('/twitter/callback',
   }
 );
 
+router.post("/unlink/:provider", authenticateToken, async (req, res) => {
+  const { provider } = req.params; // "twitter" | "linkedin" | "instagram"
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    // Remove the connected account
+    if (user.connectedAccounts[provider]) {
+      user.connectedAccounts[provider] = undefined; // or delete user.connectedAccounts[provider];
+      await user.save();
+      return res.json({ message: `${provider} disconnected successfully` });
+    }
+
+    return res.status(400).json({ message: `${provider} not connected` });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+
 /**
  * Initiate LinkedIn OAuth
  */

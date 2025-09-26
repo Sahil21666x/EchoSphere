@@ -79,7 +79,11 @@ class SchedulerService {
 
     for (const platform of post.platforms) {
       try {
+    
+        
         const result = await this.publishToPlatform(post, platform);
+        console.log('Publish result:', result);
+        
         
         // Log successful publish
         await this.logPublishAttempt(post._id, platform, 'success', result);

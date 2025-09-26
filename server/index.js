@@ -7,8 +7,6 @@ const rateLimit = require('express-rate-limit');
 const session = require('express-session');
 const { authenticateToken } = require('./middleware/auth');
 
-console.log('index.js loaded');
-
 const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
 
 const connectDB = require('./config/database');
@@ -22,6 +20,10 @@ const accountsRoutes = require('./routes/accounts');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+const crypto = require('crypto');
+const querystring = require('querystring');
+const axios = require('axios');
+const User = require('./models/User');
 
 connectDB();
 
@@ -101,17 +103,41 @@ app.get('/api/dashboard/upcoming-posts', authenticateToken, async (req, res, nex
   postsRoutes(req, res, next);
 });
 
-app.post('/api/accounts/link/twitter', authenticateToken, (req, res) => {
+function base64URLEncode(str) {
+  return str.toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=/g, '');
+}
+
+function sha256(buffer) {
+  return crypto.createHash('sha256').update(buffer).digest();
+}
+
+
+ app.post('/api/accounts/link/twitter', authenticateToken, (req, res) => {
   req.session.userId = req.userId;
 
-  const crypto = require('crypto');
-  const nonce = crypto.randomBytes(32).toString('hex');
-  req.session.oauthNonce = nonce;
-  req.session.oauthProvider = 'twitter';
+  // Generate code verifier & code challenge
+  const codeVerifier = base64URLEncode(crypto.randomBytes(32));
+  const codeChallenge = base64URLEncode(sha256(codeVerifier));
 
-  const baseUrl = `${req.protocol}://${req.get('host')}`;
-  res.json({ url: `${baseUrl}/auth/twitter` });
+  req.session.codeVerifier = codeVerifier;
+
+  const params = {
+    response_type: 'code',
+    client_id: process.env.TWITTER_CLIENT_ID,
+    redirect_uri: process.env.TWITTER_CALLBACK_URL,
+    scope: 'tweet.read tweet.write users.read offline.access',
+    state: crypto.randomBytes(16).toString('hex'),
+    code_challenge: codeChallenge,
+    code_challenge_method: 'S256',
+  };
+
+  const url = `https://twitter.com/i/oauth2/authorize?${querystring.stringify(params)}`;
+  res.json({ url });
 });
+
 
 app.get('/auth/twitter', (req, res, next) => {
   if (!req.session.userId) {
@@ -121,21 +147,52 @@ app.get('/auth/twitter', (req, res, next) => {
   passport.authenticate('twitter')(req, res, next);
 });
 
-app.get('/auth/twitter/callback', 
-  (req, res, next) => {
-    if (!req.session.userId || !req.session.oauthNonce || req.session.oauthProvider !== 'twitter') {
-      console.error('OAuth callback: Missing session data for CSRF protection');
-      return res.redirect(`${CLIENT_URL}/accounts?error=twitter_csrf`);
-    }
-    next();
-  },
-  passport.authenticate('twitter', { failureRedirect: `${CLIENT_URL}/accounts?error=twitter` }),
-  (req, res) => {
-    delete req.session.oauthNonce;
-    delete req.session.oauthProvider;
-    res.redirect(`${CLIENT_URL}/accounts?success=twitter`);
+app.get('/auth/twitter/callback', async (req, res) => {
+  const { code } = req.query;
+  const codeVerifier = req.session.codeVerifier;
+  const userId = req.session.userId;
+
+  if (!code || !codeVerifier || !userId) {
+    return res.redirect(`${CLIENT_URL}/accounts?error=twitter`);
   }
-);
+
+  try {
+    // Exchange code for access token + refresh token
+    const tokenResponse = await axios.post('https://api.twitter.com/2/oauth2/token', querystring.stringify({
+      client_id: process.env.TWITTER_CLIENT_ID,
+      grant_type: 'authorization_code',
+      code,
+      redirect_uri: process.env.TWITTER_CALLBACK_URL,
+      code_verifier: codeVerifier,
+    }), {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded',
+       'Authorization': 'Basic ' + Buffer.from(`${process.env.TWITTER_CLIENT_ID}:${process.env.TWITTER_CLIENT_SECRET}`).toString('base64')
+       }
+    });
+
+    const { access_token, refresh_token, expires_in } = tokenResponse.data;
+
+    // Save tokens to user in DB
+    const user = await User.findById(userId);
+    user.connectedAccounts = user.connectedAccounts || {};
+    user.connectedAccounts.twitter = {
+      accessToken: access_token,
+      refreshToken: refresh_token,
+      expiresAt: Date.now() + expires_in * 1000,
+      username: user.username // optional: fetch from Twitter API
+    };
+    await user.save();
+
+    // Clear session PKCE
+    delete req.session.codeVerifier;
+
+    res.redirect(`${CLIENT_URL}/accounts?success=twitter`);
+  } catch (err) {
+    console.error('Twitter OAuth2 error:', err.response?.data || err.message);
+    res.redirect(`${CLIENT_URL}/accounts?error=twitter`);
+  }
+});
+
 
 app.post('/api/accounts/link/linkedin', authenticateToken, (req, res) => {
   req.session.userId = req.userId;
@@ -158,6 +215,14 @@ app.get('/auth/linkedin', (req, res, next) => {
     state: req.session.oauthNonce
   })(req, res, next);
 });
+
+app.get('/auth/linkedin-login', passport.authenticate('linkedin-login'));
+
+app.get('/auth/linkedin-login/callback',
+  passport.authenticate('linkedin-login', { failureRedirect: '/login' }),
+  (req, res) => res.redirect('/dashboard')
+);
+
 
 app.get('/auth/linkedin/callback', 
   (req, res, next) => {

@@ -1,4 +1,3 @@
-const { log } = require('console');
 const User = require('../models/User');
 const { verifyToken, extractToken } = require('../utils/auth');
 
