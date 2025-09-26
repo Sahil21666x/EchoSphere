@@ -8,7 +8,7 @@ import HomePage from "@/pages/home-page";
 import AuthPage from "@/pages/auth-page";
 import NotFound from "@/pages/not-found";
 import { ProtectedRoute } from "./lib/ProtectedRoute";
-import { PublicRoute } from "./lib/publicRoute";
+import { PublicRoute } from "./lib/PublicRoute";
 import AccountsPage from "./pages/AccountsPage";
 
 
